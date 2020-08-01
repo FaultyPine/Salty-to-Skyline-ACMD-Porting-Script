@@ -1,0 +1,13 @@
+       // Lucas Magnet
+        ACMD("BATTLE_OBJECT_CATEGORY_FIGHTER", "FIGHTER_KIND_LUCAS", "special_lw_start", "game_speciallwstart",
+            [] (ACMD* acmd)->void {
+                acmd->frame(0);
+                if(acmd->is_excute()){
+                    MotionModule::set_rate(acmd->module_accessor, 1.5);
+                }
+                acmd->wait(6);
+                if (acmd->is_excute()) {
+                    MotionModule::set_rate(acmd->module_accessor, 1.0);
+                    acmd->ATTACK(/*ID*/ 0, /*Part*/ 0, /*Bone*/ hash40("top"), /*Damage*/ 0.0, /*Angle*/ 180, /*KBG*/ 100, /*FKB*/ 23, /*BKB*/ 0, /*Size*/ 7.0, /*X*/ 0.0, /*Y*/ 6.5, /*Z*/ 11.5, /*Hitlag*/ 0.0, /*SDI*/ 0.0, /*Clang/Rebound*/ ATTACK_SETOFF_KIND_OFF, /*FacingRestrict*/ ATTACK_LR_CHECK_POS, /*SetWeight*/ false, /*ShieldDamage*/ 0, /*Trip*/ 0.0, /*Rehit*/ 6, /*Reflectable*/ false, /*Absorbable*/ false, /*Flinchless*/ true, /*DisableHitlag*/ true, /*Direct/Indirect*/ false, /*Ground/Air*/ COLLISION_SITUATION_MASK_GA, /*Hitbits*/ COLLISION_CATEGORY_MASK_ALL, /*CollisionPart*/ COLLISION_PART_MASK_ALL, /*FriendlyFire*/ false, /*Effect*/ hash40("collision_attr_normal"), /*SFXLevel*/ ATTACK_SOUND_LEVEL_S, /*SFXType*/ COLLISION_SOUND_ATTR_NONE, /*Type*/ ATTACK_REGION_NONE);
+                }                 
+        }),
