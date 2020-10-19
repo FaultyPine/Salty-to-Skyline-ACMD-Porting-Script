@@ -37,6 +37,8 @@ def format_to_skyline_acmd(oldlst):
         ["0x0", "false"]
     ]
 
+    bracket_stack = []
+
     for line in oldlst:
         newline = line
         for x in replaceTexts:
@@ -72,6 +74,20 @@ def format_to_skyline_acmd(oldlst):
             frame = int(newline[newline.find("(")+1:newline.find(")")]) + 1 # <- increment here
             newline = "frame(" + str(frame) + ")"
 
+        #   Indent lines properly based on { and }
+        if newline[len(newline)-1] == "{":
+            bracket_stack.append("{")           # append == pushing
+            for bracket in range(len(bracket_stack)-1):
+                newline = "\t" + newline
+        elif newline[len(newline)-1] == "}":
+            bracket_stack.pop()
+            for bracket in bracket_stack:
+                newline = "\t" + newline
+        elif not "{" in newline and not "})," in newline:
+            for bracket in bracket_stack:
+                newline = "\t" + newline
+
+
         lst.append(newline)
     return lst
 
@@ -99,7 +115,7 @@ def format_skyline_acmd_header(oldlst):
         lst = lst[1:]
     lst = ["});\n}" if line == "})," else line for line in lst] # account for acmd!({ and for end of function {
 
-    # parse old Salty acmd header for relevant info ---         IF FOR SOME REASON YOU WANNA CHANGE THIS - use .split(",") which will split the string into a list seperated by the specified delimiter
+    # parse old Salty acmd header for relevant info ---         shoulda used .split but didn't know it existed until after i wrote the logic LMAO... oh well... it works :)
 
         # battle_object_kind
     battle_object_kind_start_idx = old_acmd_header.find("FIGHTER_KIND_")
