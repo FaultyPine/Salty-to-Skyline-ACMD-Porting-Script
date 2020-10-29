@@ -41,6 +41,7 @@ def format_to_skyline_acmd(oldlst):
 
     for line in oldlst:
         newline = line
+        #try:
         for x in replaceTexts:
             newline = newline.replace(x[0], x[1])
 
@@ -70,22 +71,26 @@ def format_to_skyline_acmd(oldlst):
             newline = newline.replace("grab(MA_MSC_CMD_GRAB_CLEAR_ALL)", "sv_module_access::grab(MA_MSC_CMD_GRAB_CLEAR_ALL)")
 
         # increment frame declarations
-        if "frame(" in newline:
+        if "frame(" in newline and "_frame(" not in newline:
             frame = int(newline[newline.find("(")+1:newline.find(")")]) + 1 # <- increment here
             newline = "frame(" + str(frame) + ")"
 
         #   Indent lines properly based on { and }
-        if newline[len(newline)-1] == "{":
-            bracket_stack.append("{")           # append == pushing
-            for bracket in range(len(bracket_stack)-1):
-                newline = "\t" + newline
-        elif newline[len(newline)-1] == "}":
-            bracket_stack.pop()
-            for bracket in bracket_stack:
-                newline = "\t" + newline
-        elif not "{" in newline and not "})," in newline:
-            for bracket in bracket_stack:
-                newline = "\t" + newline
+        tab_space = "    "
+        if len(newline) > 0:
+            if newline[len(newline)-1] == "{":
+                bracket_stack.append("{")           # append == pushing
+                for bracket in range(len(bracket_stack)-1):
+                    newline = tab_space + newline
+            elif newline[len(newline)-1] == "}":
+                bracket_stack.pop()
+                for bracket in bracket_stack:
+                    newline = tab_space + newline
+            elif not "{" in newline and not "})," in newline:
+                for bracket in bracket_stack:
+                    newline = tab_space + newline
+        #except:
+         #   print("invalid line: " + newline)
 
 
         lst.append(newline)
