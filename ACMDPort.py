@@ -1,4 +1,5 @@
 import sys
+import re
 
 def assure_newlines(lst): # make sure all entries in the array of lines has a newline character at the end
     newlst = []
@@ -45,6 +46,8 @@ def format_to_skyline_acmd(oldlst):
         for x in replaceTexts:
             newline = newline.replace(x[0], x[1])
 
+        newline = re.sub(r"\(u64\)(\w+)\)", r'\1 as u64)', newline)
+        newline = newline.replace("notify_event_msc_cmd", "sv_module_access::notify_event_msc_cmd")
 
         #   adding LUA_VOID args to ATTACK funcs that don't have X2/Y2/Z2  (assumed if X2 is present, the rest are also)
         if "ATTACK" in newline and "X2" not in newline: # doesn't have X2/Y2/Z2 args - needs LUA_VOID's
