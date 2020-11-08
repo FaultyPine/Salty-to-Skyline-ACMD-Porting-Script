@@ -23,7 +23,39 @@ def align_and_strip(inputlst): # specifically for when nyx put ATTACK args in a 
 
     return lst
 
+# just put random special case fixes here lol
+def final_cleanup(lst):
+    newlst = []
 
+    for linenum in range(len(lst)):
+        newline = lst[linenum]
+
+        # fix AttackHeight struct args
+        if " ATTACK_HEIGHT_" in newline:
+            start = newline[:newline.find("( ") + 1]
+            height = newline[newline.find("(") + 1: newline.find(",")].strip()
+            thing = "app::AttackHeight(*" + height + ")"
+            newline = start + thing + newline[newline.find(","):]
+
+        # fix HitStatus struct args
+        elif "HitModule::set_status_all( HIT_STATUS_" in newline:
+            start = newline[:newline.find("( ") + 1]
+            status = newline[newline.find("(") + 1: newline.find(",")].strip()
+            thing = "app::HitStatus(*" + status + ")"
+            newline = start + thing + newline[newline.find(","):]
+
+        # make sure set_add_reaction_frame gets a float for the second arg
+        elif "/*Frames*/ " in newline:
+            num = newline[newline.find("/*Frames") + 10 : newline.find(", /*Unk")].strip()
+            if "." not in num:
+                num = num + ".0"
+            newline = newline[:newline.find("/*Frames") + 10] + " " + num + newline[newline.find(", /*Unk"):]
+
+
+
+        newlst.append(newline)
+    
+    return newlst
 
 
 def format_to_skyline_acmd(oldlst):
@@ -34,8 +66,10 @@ def format_to_skyline_acmd(oldlst):
         ["game_CaptureCutCommon(acmd)", "game_CaptureCutCommon()"],
         ["module_accessor,", ""],
         ["module_accessor", ""],
-        ["0x1", "true"],
-        ["0x0", "false"]
+        ["0x1,", "true,"],
+        ["0x0,", "false,"],
+        ["0x1)", "true)"],
+        ["0x0)", "false)"]
     ]
 
     bracket_stack = []
@@ -47,7 +81,7 @@ def format_to_skyline_acmd(oldlst):
             newline = newline.replace(x[0], x[1])
 
         newline = re.sub(r"\(u64\)(\w+)\)", r'\1 as u64)', newline)
-        newline = newline.replace("notify_event_msc_cmd", "sv_module_access::notify_event_msc_cmd")
+        newline = newline.replace("notify_event_msc_cmd", "sv_battle_object::notify_event_msc_cmd")
 
         #   adding LUA_VOID args to ATTACK funcs that don't have X2/Y2/Z2  (assumed if X2 is present, the rest are also)
         if "ATTACK" in newline and "X2" not in newline: # doesn't have X2/Y2/Z2 args - needs LUA_VOID's
@@ -70,7 +104,7 @@ def format_to_skyline_acmd(oldlst):
 
 
         # now that wraps are fixed - we gotta fix wrap function namespace stuff (I.E. sv_module_access or any other sv_ namespaces)
-        if "grab" in newline:
+        if "grab," in newline:
             newline = newline.replace("grab(MA_MSC_CMD_GRAB_CLEAR_ALL)", "sv_module_access::grab(MA_MSC_CMD_GRAB_CLEAR_ALL)")
 
         # increment frame declarations
@@ -156,7 +190,7 @@ def format_skyline_acmd_header(oldlst):
 
 
 def convert_acmd(lst):
-    return assure_newlines(format_skyline_acmd_header(format_to_skyline_acmd(align_and_strip(lst))))
+    return final_cleanup(assure_newlines(format_skyline_acmd_header(format_to_skyline_acmd(align_and_strip(lst)))))
 
 
 def main():
