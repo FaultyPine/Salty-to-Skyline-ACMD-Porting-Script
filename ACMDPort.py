@@ -1,6 +1,12 @@
 import sys
 import re
 
+def find_nth(string, substring, n):
+   if (n == 1):
+       return string.find(substring)
+   else:
+       return string.find(substring, find_nth(string, substring, n - 1) + 1)
+
 def assure_newlines(lst): # make sure all entries in the array of lines has a newline character at the end
     newlst = []
     for entry in lst:
@@ -50,6 +56,19 @@ def final_cleanup(lst):
             if "." not in num:
                 num = num + ".0"
             newline = newline[:newline.find("/*Frames") + 10] + " " + num + newline[newline.find(", /*Unk"):]
+
+
+        elif "for(" in newline:
+            indent = newline[:newline.find("for")]
+            second_semicolon = find_nth(newline, ";", 2)
+            num_iterations = "ERROR"
+            for x in range(second_semicolon, 0, -1):
+                print(newline[x])
+                if newline[x] == " ":
+                    num_iterations = newline[x:second_semicolon].strip()
+                    break
+
+            newline = indent + "for(" + num_iterations + " Iterations) {\n"
 
 
 
@@ -104,7 +123,7 @@ def format_to_skyline_acmd(oldlst):
 
 
         # now that wraps are fixed - we gotta fix wrap function namespace stuff (I.E. sv_module_access or any other sv_ namespaces)
-        if "grab," in newline:
+        if "grab" in newline:
             newline = newline.replace("grab(MA_MSC_CMD_GRAB_CLEAR_ALL)", "sv_module_access::grab(MA_MSC_CMD_GRAB_CLEAR_ALL)")
 
         # increment frame declarations
