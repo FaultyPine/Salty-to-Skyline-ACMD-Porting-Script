@@ -70,6 +70,18 @@ def final_cleanup(lst):
 
             newline = indent + "for(" + num_iterations + " Iterations) {\n"
 
+        elif "(u64)0x" in newline:
+            new_str = newline
+            start_idx = newline.find("(u64)0x")
+            start_str = newline[:start_idx]
+            thing = newline[start_idx:]
+            end_idx = thing.find(",") + start_idx
+            end_str = newline[ end_idx : ]
+            hex_str = newline[start_idx : end_idx]
+            new_str = start_str + hex_str.replace("(u64)", "") + " as u64" + end_str
+            newline = new_str
+
+
 
 
         newlst.append(newline)
