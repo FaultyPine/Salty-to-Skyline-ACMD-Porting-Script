@@ -1,5 +1,6 @@
 import sys
 import re
+import os
 
 def find_nth(string, substring, n):
    if (n == 1):
@@ -50,6 +51,22 @@ def final_cleanup(lst):
             thing = "app::HitStatus(*" + status + ")"
             newline = start + thing + newline[newline.find(","):]
 
+                # fix HitStatus struct args
+        elif "ARTICLE_OPE_TARGET_" in newline:
+            start_article_idx = newline.find("ARTICLE_OPE_TARGET_")
+            start_str = newline[:start_article_idx]
+
+            article_end_idx = -1
+            if newline[start_article_idx:].find(",") == -1:
+                article_end_idx = newline[start_article_idx:].find(")") + start_article_idx
+            else:
+                article_end_idx = newline[start_article_idx:].find(",") + start_article_idx
+
+            article_ope = newline[start_article_idx : article_end_idx]
+            
+            thing = "app::ArticleOperationTarget(*" + article_ope + ")"
+            newline = start_str + thing + newline[article_end_idx:]
+
         # make sure set_add_reaction_frame gets a float for the second arg
         elif "/*Frames*/ " in newline:
             num = newline[newline.find("/*Frames") + 10 : newline.find(", /*Unk")].strip()
@@ -63,7 +80,6 @@ def final_cleanup(lst):
             second_semicolon = find_nth(newline, ";", 2)
             num_iterations = "ERROR"
             for x in range(second_semicolon, 0, -1):
-                print(newline[x])
                 if newline[x] == " ":
                     num_iterations = newline[x:second_semicolon].strip()
                     break
@@ -80,6 +96,22 @@ def final_cleanup(lst):
             hex_str = newline[start_idx : end_idx]
             new_str = start_str + hex_str.replace("(u64)", "") + " as u64" + end_str
             newline = new_str
+
+
+        if "Module" in newline and "hash40" in newline:
+            newline = newline.replace("hash40", "Hash40::new")
+
+        if "app::sv_animcmd::" in newline:
+            newline = newline.replace("app::sv_animcmd::", "")
+
+        if "app::lua_bind" in newline:
+            newline = newline.replace("app::lua_bind::", "")
+
+        if "shield(" in newline:
+            newline = newline.replace("shield(", "sv_module_access::shield(")
+
+        if "damage(" in newline:
+            newline = newline.replace("damage(", "sv_module_access::damage(")
 
 
 
@@ -107,7 +139,6 @@ def format_to_skyline_acmd(oldlst):
 
     for line in oldlst:
         newline = line
-        #try:
         for x in replaceTexts:
             newline = newline.replace(x[0], x[1])
 
@@ -140,7 +171,11 @@ def format_to_skyline_acmd(oldlst):
 
         # increment frame declarations
         if "frame(" in newline and "_frame(" not in newline:
-            frame = int(newline[newline.find("(")+1:newline.find(")")]) + 1 # <- increment here
+            try:
+                frame = int(newline[newline.find("(")+1:newline.find(")")]) + 1 # <- increment here
+            except:
+                frame = float(newline[newline.find("(")+1:newline.find(")")]) + 1.0
+
             newline = "frame(" + str(frame) + ")"
 
         #   Indent lines properly based on { and }
@@ -157,8 +192,6 @@ def format_to_skyline_acmd(oldlst):
             elif not "{" in newline and not "})," in newline:
                 for bracket in bracket_stack:
                     newline = tab_space + newline
-        #except:
-         #   print("invalid line: " + newline)
 
 
         lst.append(newline)
@@ -224,6 +257,142 @@ def convert_acmd(lst):
     return final_cleanup(assure_newlines(format_skyline_acmd_header(format_to_skyline_acmd(align_and_strip(lst)))))
 
 
+
+def seperate_acmd_to_files():
+    file = open("ConvertedACMD.txt", "r")
+    lines = file.readlines()
+    file.close()
+
+    # first we wanna get all the acmd funcs sorted into characters
+    fighters = {} # hashmap of    fighter_name (str), { animation - [actual acmd obj] }
+    for line in lines:
+        if "FIGHTER_KIND_" in line:
+            fighter = line[line.find("FIGHTER_KIND_") + 13 : line.find(",")].lower()
+            if fighter not in fighters:
+                fighters[fighter] = {}
+    cwd = os.getcwd()
+    for fighter in fighters:
+        if not os.path.isdir(cwd + "/" + fighter):
+            os.mkdir(cwd + "/" + fighter)
+
+        # insert fighter acmd objs into fighters hashmap
+        fighter_name = ""
+        acmd_obj_start = -1
+        acmd_obj_end = -1
+        for linenum in range(len(lines)):
+            line = lines[linenum]
+
+            if "battle_object_kind =" in line:
+                fighter_name = line[line.find("FIGHTER_KIND_") + 13 : line.find(",")].lower()                    
+
+            if "acmd_func" in line:
+                acmd_obj_start = linenum
+            elif "animation =" in line:
+                animation = line[line.find('"')+1 : find_nth(line, '"', 2)]
+            elif "});" in line:
+                acmd_obj_end = linenum+1
+                if fighter == fighter_name:
+                    fighters[fighter][animation] = lines[acmd_obj_start : acmd_obj_end+1]
+
+    # then sort the acmd in each character into tilts/smashes/specials/aerials/ground/other
+
+    # make all the files first for all the fighters (blank)
+    for fighter in fighters:
+        cwd = os.path.join(os.getcwd(), fighter)
+        for move_type in ["aerials", "ground", "other", "smashes", "specials", "throws", "tilts"]:
+            open(os.path.join(cwd, move_type) + ".rs", "w+")
+
+    # go through acmd objs, check animation to derive move type
+
+    for fighter in fighters:
+        cwd = os.path.join(os.getcwd(), fighter)
+        # write the acmd obj(s) to the relevant file(s)
+        for move_type in ["aerials", "ground", "smashes", "specials", "throws", "tilts", "other"]:
+            file = open(os.path.join(cwd, move_type) + ".rs", "w+")
+            for animation, acmd_obj in fighters[fighter].items():
+                if "special" in animation and move_type == "specials" and fighters[fighter][animation] != "NONE":
+                    file.writelines(acmd_obj)
+                    file.write("\n\n")
+                    fighters[fighter][animation] = "NONE"
+
+                elif "attack_air_" in animation and move_type == "aerials" and fighters[fighter][animation] != "NONE":
+                    file.writelines(acmd_obj)
+                    file.write("\n\n")
+                    fighters[fighter][animation] = "NONE"
+
+                elif ("attack_dash" in animation or "attack_1" in animation) and move_type == "ground" and fighters[fighter][animation] != "NONE":
+                    file.writelines(acmd_obj)
+                    file.write("\n\n")
+                    fighters[fighter][animation] = "NONE"
+
+                elif 4 in [int(s) for s in [s for s in animation] if s.isdigit()]  and move_type == "smashes" and fighters[fighter][animation] != "NONE": # smashes
+                    file.writelines(acmd_obj)
+                    file.write("\n\n")
+                    fighters[fighter][animation] = "NONE"
+
+                elif 3 in [int(s) for s in [s for s in animation] if s.isdigit()] and move_type == "tilts" and fighters[fighter][animation] != "NONE": # tilts
+                    file.writelines(acmd_obj)
+                    file.write("\n\n")
+                    fighters[fighter][animation] = "NONE"
+
+                elif move_type == "other" and fighters[fighter][animation] != "NONE":
+                    file.writelines(acmd_obj)
+                    file.write("\n\n")
+                    fighters[fighter][animation] = "NONE"
+
+            file.close()
+
+            
+
+    # then in each of those, set up the acmd::add_hooks call
+
+    for fighter in fighters:
+        cwd = os.path.join(os.getcwd(), fighter)
+        # write the acmd obj(s) to the relevant file(s)
+        for move_type in ["aerials", "ground", "other", "smashes", "specials", "throws", "tilts"]:
+            file = open(os.path.join(cwd, move_type) + ".rs", "r")
+            lines = file.readlines()
+            file.close()
+
+            acmd_add_hooks = [
+                "use smash::app::{self, lua_bind::*};\n",
+                "use smash::hash40;\n",
+                "use smash::lib::lua_const::*;\n",
+                "use smash::lua2cpp::L2CFighterCommon;\n",
+                "use smash::phx::*;\n",
+                "use smash::app::utility::*;\n",
+                "use crate::utils::hdr;\n",
+                "use crate::vars::*;\n\n\n",
+                "pub fn install() {\n",
+                "    acmd::add_hooks!(\n",
+                "    );\n",
+                "}\n\n\n"
+            ]
+            funcs = []
+            for line in lines:
+                if "fn " in line:
+                    func_name = line[line.find("fn ") + 3 : line.find("(")]
+                    funcs.append(func_name)
+
+            funcs.reverse()
+            for func_num in range(len(funcs)):
+                if func_num == 0:
+                    acmd_add_hooks.insert(10, "        " + funcs[func_num] + "\n")
+                else:
+                    acmd_add_hooks.insert(10, "        " + funcs[func_num] + ",\n")
+
+            acmd_add_hooks.reverse()
+            for line in acmd_add_hooks:
+                lines.insert(0, line)
+
+            file = open(os.path.join(cwd, move_type) + ".rs", "w")
+            file.writelines(lines)
+            file.close()
+
+
+
+
+
 def main():
     filename = sys.argv[1]
     file = open(filename, "r")
@@ -244,5 +413,7 @@ def main():
     for lst in finallst:
         newfile.writelines(lst)
     newfile.close()
+
+    seperate_acmd_to_files()
 
 main()
